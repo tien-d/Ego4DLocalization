@@ -1,7 +1,7 @@
 ## Egocentric video relocalization pipeline
 
-* Step 1: Prepare a 3d scan folder with images, poses, 3d meshes, point cloud in [here](data/scan) and an egocentric video with images in [here](data/egovideo).
-Data can be downloaded [here](https://drive.google.com/file/d/1aHp99pTVa7G9qsIc211CjJpk8KTMcrUd/view?usp=sharing).
+* Step 1: Prepare a 3d scan folder with images, poses, 3d meshes, point cloud in `./data/scan` and an egocentric video with images in `data/egovideo`.
+Sample data can be downloaded [here](https://drive.google.com/file/d/1aHp99pTVa7G9qsIc211CjJpk8KTMcrUd/view?usp=sharing).
 
 * Step 2: run the following script for a relocalization of the egocentric video w.r.t the 3d scan mesh as:
 
