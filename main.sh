@@ -17,6 +17,6 @@ python SuperGlueMatching/match_pairs_api.py \
 
 echo "Obtain poses with PnP"
 python pnp_api.py \
---superglue_match_folder $2/superglue_match_results/ \
+--azure_dataset_folder $2 \
 --matterport_descriptors_folder $1/descriptors/ \
 --output_dir $2/poses_reloc/
