@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
     mesh_file = fnmatch.filter(os.listdir(os.path.join('./data', 'scan', 'matterpak')), '*.obj')[0]
     mesh = o3d.io.read_triangle_mesh(os.path.join('./data', 'scan', 'matterpak', mesh_file), enable_post_processing=True)
-    custom_draw_geometry_with_camera_trajectory(mesh, output_path=SAVING_SUBFOLDER,
+    custom_draw_geometry_with_camera_trajectory(mesh, output_path=os.path.join(ROOT_FOLDER, SAVING_SUBFOLDER),
                                                 input_image_folder=ROOT_FOLDER,
                                                 trajectory='./egovideo_camera_traj.json',
                                                 G_T_Ci=Ci_T_G,
