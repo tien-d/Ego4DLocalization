@@ -3,7 +3,6 @@ import cv2
 import fnmatch
 
 from utils import *
-from models.superpoint import SuperPoint
 import argparse
 import random
 import numpy as np
@@ -16,7 +15,8 @@ from PIL import Image
 import os
 from torch.utils.data import DataLoader
 
-from models.utils import read_image
+from SuperGlueMatching.models.utils import read_image
+from SuperGlueMatching.models.superpoint import SuperPoint
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KDTree
 import pickle
@@ -27,14 +27,14 @@ parser = argparse.ArgumentParser(
         description='Image pair matching and pose evaluation with SuperGlue',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument(
-    '--matterport_descriptors_folder', type=str, default='/home/kvuong/dgx-projects/ego4d_data/Matterport',
-    help='SuperGlue match threshold')
+    '--matterport_descriptors_folder', type=str, default='',
+    help='Matterport data set')
 parser.add_argument(
-    '--matterport_output_folder', type=str, default='/home/kvuong/dgx-projects/ego4d_data/Matterport',
-    help='SuperGlue match threshold')
+    '--matterport_output_folder', type=str, default='',
+    help='Matterport data set')
 parser.add_argument(
-    '--azure_dataset_folder', type=str, default='/home/kvuong/dgx-projects/ego4d_data/KinectAzure/walterb18',
-    help='SuperGlue match threshold')
+    '--ego_dataset_folder', type=str, default='',
+    help='Ego data set')
 
 opt = parser.parse_args()
 
@@ -136,12 +136,12 @@ else:
 # ######### STEP 2: QUERY IMAGE FROM DATABASE
 kdt = KDTree(vlad_image_descriptors, leaf_size=30, metric='euclidean')
 
-AZURE_DATASET_FOLDER = opt.azure_dataset_folder
+EGO_DATASET_FOLDER = opt.ego_dataset_folder
 
-if not os.path.exists(os.path.join(AZURE_DATASET_FOLDER, 'vlad_best_match')):
-    os.makedirs(os.path.join(AZURE_DATASET_FOLDER, 'vlad_best_match'))
+if not os.path.exists(os.path.join(EGO_DATASET_FOLDER, 'vlad_best_match')):
+    os.makedirs(os.path.join(EGO_DATASET_FOLDER, 'vlad_best_match'))
 
-ego_dataset = AzureKinect(dataset_folder=AZURE_DATASET_FOLDER, skip_every_n_image=1,
+ego_dataset = AzureKinect(dataset_folder=EGO_DATASET_FOLDER, skip_every_n_image=1,
                           start_idx=0, end_idx=-1)
 data_loader = DataLoader(dataset=ego_dataset,
                             num_workers=4, batch_size=16,
@@ -185,7 +185,7 @@ with torch.no_grad():
                 match_pair['matterport'].append(
                     os.path.join(IMAGE_DESC_FOLDER, 'image_%06d_descriptors.npz' % (image_indices[ret_query[qids]])))
                 match_pair['ego'].append(
-                    os.path.join(AZURE_DATASET_FOLDER, 'color', 'color_%07d.jpg' % images['image_index'][j]))
+                    os.path.join(EGO_DATASET_FOLDER, 'color', 'color_%07d.jpg' % images['image_index'][j]))
 
-with open(os.path.join(AZURE_DATASET_FOLDER, 'vlad_best_match', 'queries.pkl'), 'wb') as f:
+with open(os.path.join(EGO_DATASET_FOLDER, 'vlad_best_match', 'queries.pkl'), 'wb') as f:
     pickle.dump(match_pair, f)

@@ -4,6 +4,10 @@ import cv2
 import os
 import cv2
 import numpy as np
+import torch
+import fnmatch
+from torch.utils.data.dataset import Dataset
+from SuperGlueMatching.models.utils import read_image
 
 import open3d as o3d
 
@@ -98,7 +102,6 @@ def WritePosesToPly(P, output_path):
         T = np.eye(4)
         T[:3, :3] = P[j, :, :3].transpose()
         T[:3, 3] = -P[j, :, :3].transpose() @ P[j, :, 3]
-        # print(T)
         m = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.4)
         m.transform(T)
         if m_cam is None:
@@ -216,3 +219,65 @@ def VisualizeBadPoseImage(Im):
     small_out_image = cv2.resize(out_img, (out_img.shape[1] // 8, out_img.shape[0] // 8))
     cv2.imshow('bad pose images', small_out_image)
     cv2.waitKey(0)
+
+## Below is for the visual database API
+
+def convert_2d_to_3d(u, v, z, K):
+    v0 = K[1][2]
+    u0 = K[0][2]
+    fy = K[1][1]
+    fx = K[0][0]
+    x = (u - u0) * z / fx
+    y = (v - v0) * z / fy
+    return x, y, z
+
+
+class MatterportDataset(Dataset):
+    def __init__(self, dataset_folder='walterlib', resize=[640, 480]):
+        super(MatterportDataset, self).__init__()
+        self.dataset_folder = dataset_folder
+        self.data_path = os.path.join(self.dataset_folder, 'color')
+        self.data_info = sorted(os.listdir(self.data_path))
+        # self.data_info = self.data_info[:10]
+        self.data_len = len(self.data_info)
+        self.resize = resize
+
+    def __getitem__(self, index):
+        color_info = os.path.join(self.data_path, self.data_info[index])
+        # print(color_info)
+        _, gray_tensor, _ = read_image(color_info, 'cpu', resize=self.resize, rotation=0, resize_float=False)
+        gray_tensor = gray_tensor.reshape(1, 480, 640)
+
+        output = {'image': gray_tensor, 'image_index': int(color_info[-10:-4])}
+
+        return output
+
+    def __len__(self):
+        return self.data_len
+
+
+class AzureKinect(Dataset):
+    def __init__(self, dataset_folder='walter_basement_03', resize=[640, 480],
+                 start_idx=0, end_idx=10000, skip_every_n_image=1):
+        super(AzureKinect, self).__init__()
+        self.dataset_folder = dataset_folder
+        self.data_path = os.path.join(self.dataset_folder, 'color')
+        self.data_info = sorted(fnmatch.filter(os.listdir(self.data_path), '*.jpg'))
+        self.data_info = self.data_info[start_idx:end_idx:skip_every_n_image]
+        self.start_idx = start_idx
+        self.data_len = len(self.data_info)
+        self.resize = resize
+
+    def __getitem__(self, index):
+        # color_info = os.path.join(self.data_path, 'color_%07d.jpg' % (self.start_idx + index))
+        color_info = os.path.join(self.data_path, self.data_info[index])
+        # print(color_info)
+        _, gray_tensor, _ = read_image(color_info, 'cpu', resize=self.resize, rotation=0, resize_float=False)
+        gray_tensor = gray_tensor.reshape(1, 480, 640)
+
+        output = {'image': gray_tensor, 'image_index': int(color_info[-11:-4])}
+
+        return output
+
+    def __len__(self):
+        return self.data_len

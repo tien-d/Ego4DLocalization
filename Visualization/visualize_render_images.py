@@ -1,4 +1,3 @@
-
 import argparse
 import sys
 import os
@@ -12,15 +11,16 @@ import json
 import fnmatch
 
 
-def create_traj_azure(output_traj, Ci_T_G=None):
+W = 960
+H = 540
 
-    K_mp = [457.1812438964844, 0., 0., 0., 478.614013671875, 0., 480. - 0.5, 270. - 0.5, 1.]
+def create_traj_azure(output_traj, K, Ci_T_G=None):
 
-    d = json.load(open('/home/tien/Code/Ego4DLocalization/Localization/camera_trajectory.json', 'r'))
+    d = json.load(open('Visualization/camera_trajectory.json', 'r'))
     dp0 = d['parameters'][0]
-    dp0['intrinsic']['width'] = 960
-    dp0['intrinsic']['height'] = 540
-    dp0['intrinsic']['intrinsic_matrix'] = K_mp
+    dp0['intrinsic']['width'] = int((K[6]+0.5)*2)
+    dp0['intrinsic']['height'] = int((K[7]+0.5)*2)
+    dp0['intrinsic']['intrinsic_matrix'] = K.tolist()
     dp0['extrinsic'] = []
     x = []
 
@@ -71,13 +71,13 @@ def custom_draw_geometry_with_camera_trajectory(pcd, output_path='', input_image
 
         if glb.index >= 0 and glb.index < len(original_img_indices):
             print("Capture image {:05d}".format(glb.index))
-            image = vis.capture_screen_float_buffer(False)
+            image = vis.capture_screen_float_buffer(False)  # True for
 
             image = np.asarray(image)
             if output_path != '':
                 color_info = os.path.join(input_image_folder, 'color/color_%07d.jpg' % original_img_indices[glb.index])
                 color_img = Image.open(color_info)
-                color_img = color_img.resize((960, 540), resample=Image.BILINEAR)
+                # color_img = color_img.resize((960, 540), resample=Image.BILINEAR)
 
                 img = (255. * image)
                 added_image = cv2.addWeighted(np.asarray(color_img), 0.8, img.astype(np.uint8), 0.5, 0)
@@ -98,7 +98,7 @@ def custom_draw_geometry_with_camera_trajectory(pcd, output_path='', input_image
 
 
     vis = custom_draw_geometry_with_camera_trajectory.vis
-    vis.create_window(width=960, height=540)
+    vis.create_window(width=840, height=480) # visible = False
     vis.add_geometry(pcd)
     setup(vis)
     vis.register_animation_callback(move_forward)
@@ -107,14 +107,28 @@ def custom_draw_geometry_with_camera_trajectory(pcd, output_path='', input_image
 
 
 if __name__ == '__main__':
-    ROOT_FOLDER = './data/egovideo'
-    INPUT_DIR = os.path.join(ROOT_FOLDER, 'poses_reloc')
+    parser = argparse.ArgumentParser(
+        description='Incremental SFM',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        '--matterport_dataset_folder', type=str, default='',
+        help='Matterport dataset folder')
+    parser.add_argument(
+        '--ego_dataset_folder', type=str, default='',
+        help='Ego dataset folder')
 
-    original_image_ids = np.arange(0, len(
-        fnmatch.filter(os.listdir(os.path.join(ROOT_FOLDER, 'color')), '*.jpg')), step=1)
-    valid_pose = np.load(os.path.join(INPUT_DIR, 'good_pose_pnp.npy'))
-    C_T_G = np.load(os.path.join(INPUT_DIR, 'camera_poses_pnp.npy'))
-    print('C_T_G ', C_T_G.shape)
+    opt = parser.parse_args()
+
+
+
+    ROOT_FOLDER = opt.ego_dataset_folder
+    INPUT_DIR = os.path.join(ROOT_FOLDER, 'track', 'poses')
+
+    original_image_ids = np.arange(0, len(fnmatch.filter(os.listdir(os.path.join(ROOT_FOLDER, 'color')), '*.jpg')))
+
+    valid_pose = np.load(os.path.join(INPUT_DIR, 'good_pose_reprojection.npy'))
+    C_T_G = np.load(os.path.join(INPUT_DIR, 'cameras_pnp_triangulation.npy'))
+
 
     Ci_T_G = np.zeros((len(original_image_ids), 4, 4))
     k = 0
@@ -122,20 +136,30 @@ if __name__ == '__main__':
         if valid_pose[i]:
             Ci_T_G[k] = np.concatenate((C_T_G[i], np.array([[0., 0., 0., 1.]])), axis=0)
             k += 1
+        else:
+            Ci_T_G[k] = np.eye(4)
+            Ci_T_G[k][2, 3] = 100
+            k += 1
 
     print("Create trajectory ...")
-    create_traj_azure(output_traj='./egovideo_camera_traj.json',
-                      Ci_T_G=Ci_T_G)
+    K = np.loadtxt('%s/intrinsics.txt' % ROOT_FOLDER)
+    K_v = np.concatenate([K[:, i] for i in range(3)], axis=0)
+    W = int((K[0,2]+0.5)*2)
+    H = int((K[1,2]+0.5)*2)
+
+    create_traj_azure(output_traj='Visualization/egovideo_camera_traj.json',
+                      K=K_v, Ci_T_G=Ci_T_G)
 
     print("Loading point cloud ...")
     SAVING_SUBFOLDER = 'pose_visualization'
     if not os.path.exists(os.path.join(ROOT_FOLDER, SAVING_SUBFOLDER)):
         os.makedirs(os.path.join(ROOT_FOLDER, SAVING_SUBFOLDER))
 
-    mesh_file = fnmatch.filter(os.listdir(os.path.join('./data', 'scan', 'matterpak')), '*.obj')[0]
-    mesh = o3d.io.read_triangle_mesh(os.path.join('./data', 'scan', 'matterpak', mesh_file), enable_post_processing=True)
+    mesh_file = fnmatch.filter(os.listdir(os.path.join(opt.matterport_dataset_folder, 'matterpak')), '*.obj')[0]
+    mesh = o3d.io.read_triangle_mesh(os.path.join(opt.matterport_dataset_folder, 'matterpak', mesh_file),
+                                     enable_post_processing=True)
     custom_draw_geometry_with_camera_trajectory(mesh, output_path=os.path.join(ROOT_FOLDER, SAVING_SUBFOLDER),
                                                 input_image_folder=ROOT_FOLDER,
-                                                trajectory='./egovideo_camera_traj.json',
+                                                trajectory='./Visualization/egovideo_camera_traj.json',
                                                 G_T_Ci=Ci_T_G,
-                                                original_img_indices=original_image_ids[valid_pose])
+                                                original_img_indices=original_image_ids)

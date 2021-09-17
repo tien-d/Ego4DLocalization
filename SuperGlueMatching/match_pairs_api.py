@@ -173,7 +173,7 @@ if __name__ == '__main__':
     with open(opt.input_pairs, 'rb') as f:
         d = pickle.load(f)
         pairs = []
-        if opt.ending_index == -1:
+        if opt.ending_index == 0:
             opt.ending_index = len(d['ego'])
         for i in range(opt.starting_index, opt.ending_index):
             pairs.append((d['ego'][i], d['matterport'][i]))
@@ -393,6 +393,13 @@ if __name__ == '__main__':
                 'Match Threshold: {:.2f}'.format(m_thresh),
                 'Image Pair: {}:{}'.format(stem0, stem1),
             ]
+
+            image1_path = Path(
+                '/home/tien/Data/Unict/unict_3dscan_004/pose_visualization/render_%06d.png' % int(name1[-22:-16]))
+            image0_path = Path('/home/tien/Data/Unict/ego001_scan004/color/color_%07d.jpg' % int(name0[-11:-4]))
+
+            image0, _, _ = read_image(image0_path, 'cpu', [640, 480], 0, True)
+            image1, _, _ = read_image(image1_path, 'cpu', [640, 480], 0, True)
 
             make_matching_plot(
                 image0, image1, kpts0, kpts1, mkpts0, mkpts1, color,
